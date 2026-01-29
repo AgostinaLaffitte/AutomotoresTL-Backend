@@ -4,6 +4,7 @@ const Vehicle = require('../models/vehicle');
 const authMiddleware = require('../middleware/auth');
 const multer = require('multer'); 
 const path = require('path');
+const fs = require('fs');
 
 // -------------------- Configuración de Multer --------------------
 const storage = multer.diskStorage({
@@ -58,27 +59,52 @@ router.post('/', authMiddleware, upload.array('images', 10), async (req, res) =>
 
 router.put('/:id', authMiddleware, upload.array('images', 10), async (req, res) => {
   try {
-    const imageFiles = req.files.map(file => file.filename);
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ error: 'Vehículo no encontrado' });
 
-    const updatedVehicle = await Vehicle.findByIdAndUpdate(
-      req.params.id,
-      {
-        brand: req.body.brand,
-        version: req.body.version,
-        year: req.body.year,
-        mileage: req.body.mileage,
-        comment: req.body.comment,
-        price: req.body.price,
-        images: imageFiles
-      },
-      { new: true }
-    );
+    // Si hay nuevas imágenes, las agregamos; si no, mantenemos las existentes
+    const imageFiles = req.files.length > 0 
+      ? [...vehicle.images, ...req.files.map(file => file.filename)]
+      : vehicle.images;
 
+    vehicle.brand = req.body.brand;
+    vehicle.version = req.body.version;
+    vehicle.year = req.body.year;
+    vehicle.mileage = req.body.mileage;
+    vehicle.comment = req.body.comment;
+    vehicle.price = req.body.price;
+    vehicle.images = imageFiles;
+
+    const updatedVehicle = await vehicle.save();
     res.json(updatedVehicle);
   } catch (err) {
-    res.status(500).json({ error: 'Error al actualizar vehículo' });
+    res.status(500).json({ error: 'Error al actualizar vehículo', details: err.message });
   }
 });
+
+
+router.delete('/:id/images/:filename', authMiddleware, async (req, res) => {
+  try {
+    const vehicle = await Vehicle.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ error: 'Vehículo no encontrado' });
+
+    // Filtrar las imágenes y sacar la que coincide
+    vehicle.images = vehicle.images.filter(img => img !== req.params.filename);
+    await vehicle.save();
+
+    // Borrar archivo físico
+    const filePath = path.join(__dirname, '../../uploads', req.params.filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+    }
+
+    res.json(vehicle);
+  } catch (err) {
+    res.status(500).json({ error: 'Error al borrar imagen', details: err.message });
+  }
+});
+
+
 
 // Eliminar vehículo
 router.delete('/:id', authMiddleware, async (req, res) => {
