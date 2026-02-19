@@ -1,21 +1,9 @@
 const express = require('express');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const router = express.Router();
 
-// Transporter con SendGrid
-const transporter = nodemailer.createTransport({
-  service: 'SendGrid',
-  auth: {
-    api_key: process.env.SENDGRID_API_KEY
-  }
-});
-
-// opcional: verificar conexión al iniciar
-transporter.verify().then(() => {
-  console.log('SendGrid listo para enviar');
-}).catch(err => {
-  console.error('Error SendGrid:', err);
-});
+// Configurar API Key de SendGrid
+sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 router.post('/', async (req, res) => {
   try {
@@ -28,9 +16,10 @@ router.post('/', async (req, res) => {
     const to = process.env.CONTACT_TO;
     const cc = process.env.CONTACT_CC || undefined;
 
-    const mailOptions = {
-      from: `"Automotores TL" <agoslaffitte17@gmail.com>`, 
-      to: process.env.CONTACT_TO,
+    const msg = {
+      to,
+      cc,
+      from: 'agoslaffitte17@gmail.com', // tu correo verificado en SendGrid
       subject: `Nuevo mensaje de contacto - ${name}`,
       html: `
         <h3>Nuevo mensaje desde el sitio</h3>
@@ -44,8 +33,7 @@ router.post('/', async (req, res) => {
       replyTo: email
     };
 
-
-    await transporter.sendMail(mailOptions);
+    await sgMail.send(msg);
     res.json({ ok: true, message: 'Correo enviado correctamente' });
   } catch (err) {
     console.error('Error al enviar correo:', err);
