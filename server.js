@@ -19,7 +19,7 @@ mongoose.connect(process.env.MONGO_URI)
 
   
 app.use('/api/contact', contactRoutes);
-app.use('c', vehicleRoutes);
+app.use('/api/vehicles', vehicleRoutes);
 app.use('/api/auth', authRoutes); 
 app.use('/api/favorites', favoritesRoutes);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
