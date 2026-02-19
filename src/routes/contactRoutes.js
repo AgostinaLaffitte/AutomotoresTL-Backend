@@ -1,23 +1,20 @@
-
 const express = require('express');
 const nodemailer = require('nodemailer');
 const router = express.Router();
 
+// Transporter con SendGrid
 const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT),
-  secure: process.env.SMTP_SECURE === 'true',
+  service: 'SendGrid',
   auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS
+    api_key: process.env.SENDGRID_API_KEY
   }
 });
 
-// opcional: verificar conexión SMTP al iniciar
+// opcional: verificar conexión al iniciar
 transporter.verify().then(() => {
-  console.log('SMTP listo para enviar');
+  console.log('SendGrid listo para enviar');
 }).catch(err => {
-  console.error('Error SMTP:', err);
+  console.error('Error SendGrid:', err);
 });
 
 router.post('/', async (req, res) => {
@@ -32,9 +29,8 @@ router.post('/', async (req, res) => {
     const cc = process.env.CONTACT_CC || undefined;
 
     const mailOptions = {
-      from: `"Automotores TL" <${process.env.SMTP_USER}>`,
-      to,
-      cc,
+      from: `"Automotores TL" <agoslaffitte17@gmail.com>`, 
+      to: process.env.CONTACT_TO,
       subject: `Nuevo mensaje de contacto - ${name}`,
       html: `
         <h3>Nuevo mensaje desde el sitio</h3>
@@ -45,8 +41,9 @@ router.post('/', async (req, res) => {
         <hr/>
         <small>Enviado automáticamente desde el formulario de contacto.</small>
       `,
-      replyTo: email // para que tu cliente pueda responder directo al remitente
+      replyTo: email
     };
+
 
     await transporter.sendMail(mailOptions);
     res.json({ ok: true, message: 'Correo enviado correctamente' });
