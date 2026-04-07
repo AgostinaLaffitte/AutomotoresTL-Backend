@@ -2,20 +2,26 @@ const express = require('express');
 const router = express.Router();
 const Vehicle = require('../models/vehicle');
 const authMiddleware = require('../middleware/auth');
-const multer = require('multer'); 
-const path = require('path');
-const fs = require('fs');
+const multer = require('multer');
+const cloudinary = require('cloudinary').v2;
+const { CloudinaryStorage } = require('multer-storage-cloudinary');
 
-// -------------------- Configuración de Multer --------------------
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, 'uploads/'); 
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + path.extname(file.originalname)); // nombre único
-  }
+// -------------------- conf multier--------------------
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
-const upload = multer({ storage: storage });
+
+const storage = new CloudinaryStorage({
+  cloudinary,
+  params: {
+    folder: 'automotores',
+    allowed_formats: ['jpg', 'jpeg', 'png', 'webp'],
+  },
+});
+
+const upload = multer({ storage });
 
 // -------------------- Rutas de imágenes --------------------
 router.post('/upload', upload.single('image'), (req, res) => {
@@ -37,7 +43,7 @@ router.post('/', authMiddleware, upload.array('images', 10), async (req, res) =>
   console.log('req.files:', req.files); 
   console.log('req.body:', req.body);
   try {
-    const imageFiles = req.files.map(file => file.filename);
+    const imageFiles = req.files.map(file => file.path);
 
     const newVehicle = new Vehicle({
       brand: req.body.brand,
@@ -64,7 +70,7 @@ router.put('/:id', authMiddleware, upload.array('images', 10), async (req, res) 
 
     // Si hay nuevas imágenes, las agregamos; si no, mantenemos las existentes
     const imageFiles = req.files.length > 0 
-      ? [...vehicle.images, ...req.files.map(file => file.filename)]
+      ? [...vehicle.images, ...req.files.map(file => file.path)]
       : vehicle.images;
 
     vehicle.brand = req.body.brand;
@@ -82,20 +88,21 @@ router.put('/:id', authMiddleware, upload.array('images', 10), async (req, res) 
   }
 });
 
-
+// DESPUÉS
 router.delete('/:id/images/:filename', authMiddleware, async (req, res) => {
   try {
     const vehicle = await Vehicle.findById(req.params.id);
     if (!vehicle) return res.status(404).json({ error: 'Vehículo no encontrado' });
 
-    // Filtrar las imágenes y sacar la que coincide
-    vehicle.images = vehicle.images.filter(img => img !== req.params.filename);
+    // La imagen guardada ahora es una URL completa, buscamos la que coincide
+    const imageUrl = vehicle.images.find(img => img.includes(req.params.filename));
+    vehicle.images = vehicle.images.filter(img => !img.includes(req.params.filename));
     await vehicle.save();
 
-    // Borrar archivo físico
-    const filePath = path.join(__dirname, '../../uploads', req.params.filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
+    // Borrar de Cloudinary usando el public_id (automotores/nombrearchivo)
+    if (imageUrl) {
+      const publicId = `automotores/${req.params.filename.split('.')[0]}`;
+      await cloudinary.uploader.destroy(publicId);
     }
 
     res.json(vehicle);
