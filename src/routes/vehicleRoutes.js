@@ -42,6 +42,11 @@ router.get('/', async (req, res) => {
 router.post('/', authMiddleware, upload.array('images', 10), async (req, res) => {
   console.log('req.files:', req.files); 
   console.log('req.body:', req.body);
+  console.log('=== CLOUDINARY CONFIG ===');
+  console.log('CLOUD NAME:', process.env.CLOUDINARY_CLOUD_NAME);
+  console.log('API KEY:', process.env.CLOUDINARY_API_KEY);
+  console.log('req.files:', req.files);
+  console.log('========================');
   try {
     const imageFiles = req.files.map(file => file.path);
 
